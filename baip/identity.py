@@ -14,6 +14,34 @@ _lib = _secp.lib
 NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 
 
+# --- Tagged hashing (BIP-340 domain separation) ---
+
+def tagged_hash(tag: str, msg: bytes) -> bytes:
+    """BIP-340 tagged hash: SHA256(SHA256(tag) || SHA256(tag) || msg)."""
+    tag_hash = hashlib.sha256(tag.encode()).digest()
+    return hashlib.sha256(tag_hash + tag_hash + msg).digest()
+
+
+# --- Canonical message builders (single source of truth) ---
+
+def canonical_update_msg(agent_id: str, fields: dict) -> bytes:
+    """Build the canonical bytes for an update signature."""
+    sorted_fields = json.dumps(fields, sort_keys=True, separators=(",", ":"))
+    raw = f"baip:update:{agent_id}:{sorted_fields}".encode()
+    return tagged_hash("BAIP/update", raw)
+
+
+def canonical_revoke_msg(agent_id: str, reason: str) -> bytes:
+    """Build the canonical bytes for a revocation signature."""
+    raw = f"baip:revoke:{agent_id}:{reason}".encode()
+    return tagged_hash("BAIP/revoke", raw)
+
+
+def canonical_attest_msg(payload_hash: bytes) -> bytes:
+    """Build the canonical bytes for an attestation signature."""
+    return tagged_hash("BAIP/attest", payload_hash)
+
+
 class AgentIdentity:
     """A BAIP agent identity backed by a secp256k1 keypair."""
 
@@ -58,10 +86,10 @@ class AgentIdentity:
     def sign(self, message: bytes) -> bytes:
         """Create a Schnorr signature (BIP-340) over a 32-byte message hash.
 
-        The message MUST be exactly 32 bytes (e.g., SHA-256 digest).
+        The message MUST be exactly 32 bytes (e.g., a tagged hash digest).
         """
         if len(message) != 32:
-            raise ValueError("Message must be exactly 32 bytes (use SHA-256 hash)")
+            raise ValueError("Message must be exactly 32 bytes (use tagged_hash)")
         return self._privkey.sign_schnorr(message)
 
     @staticmethod
@@ -74,7 +102,6 @@ class AgentIdentity:
         if len(message) != 32 or len(signature) != 64:
             return False
         try:
-            # Parse compressed pubkey to get x-only (32 bytes)
             pub_bytes = bytes.fromhex(pubkey_hex)
             if len(pub_bytes) != 33:
                 return False
@@ -128,9 +155,7 @@ class AgentIdentity:
 
     def sign_update(self, agent_id: str, fields: dict) -> dict:
         """Create a signed update inscription JSON."""
-        sorted_fields = json.dumps(fields, sort_keys=True, separators=(",", ":"))
-        canonical = f"baip:update:{agent_id}:{sorted_fields}"
-        msg_hash = hashlib.sha256(canonical.encode()).digest()
+        msg_hash = canonical_update_msg(agent_id, fields)
         sig = self.sign(msg_hash)
 
         return {
@@ -143,8 +168,7 @@ class AgentIdentity:
 
     def sign_revocation(self, agent_id: str, reason: str) -> dict:
         """Create a signed revocation inscription JSON."""
-        canonical = f"baip:revoke:{agent_id}:{reason}"
-        msg_hash = hashlib.sha256(canonical.encode()).digest()
+        msg_hash = canonical_revoke_msg(agent_id, reason)
         sig = self.sign(msg_hash)
 
         return {

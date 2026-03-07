@@ -109,7 +109,6 @@ class TestGetCurrentState:
         new_agent = AgentIdentity.generate()
         reg = make_register(agent)
 
-        # Rotate key
         update1 = agent.sign_update("abc123i0", {"pubkey": new_agent.pubkey_hex})
         state = get_current_state(reg, [update1])
         assert state["pubkey"] == new_agent.pubkey_hex
@@ -119,9 +118,7 @@ class TestGetCurrentState:
         new_agent = AgentIdentity.generate()
         reg = make_register(agent)
 
-        # Rotate key
         update1 = agent.sign_update("abc123i0", {"pubkey": new_agent.pubkey_hex})
-        # Update with new key
         update2 = new_agent.sign_update("abc123i0", {"name": "RenamedAgent"})
 
         state = get_current_state(reg, [update1, update2])
@@ -134,7 +131,6 @@ class TestGetCurrentState:
         reg = make_register(agent)
 
         update1 = agent.sign_update("abc123i0", {"pubkey": new_agent.pubkey_hex})
-        # Try to update with OLD key -- should be ignored
         update2 = agent.sign_update("abc123i0", {"name": "Hacked"})
 
         state = get_current_state(reg, [update1, update2])
@@ -144,8 +140,34 @@ class TestGetCurrentState:
         agent = AgentIdentity.generate()
         reg = make_register(agent)
         revoke = agent.sign_revocation("abc123i0", "compromised")
-        state = get_current_state(reg, [], [revoke])
+        state = get_current_state(reg, [revoke])
         assert state is None
+
+    def test_revocation_stops_subsequent_updates(self):
+        agent = AgentIdentity.generate()
+        reg = make_register(agent)
+        revoke = agent.sign_revocation("abc123i0", "compromised")
+        update = agent.sign_update("abc123i0", {"name": "Ghost"})
+        # Revocation comes first in inscription order
+        state = get_current_state(reg, [revoke, update])
+        assert state is None
+
+    def test_update_before_revocation_applied(self):
+        agent = AgentIdentity.generate()
+        reg = make_register(agent)
+        update = agent.sign_update("abc123i0", {"name": "Updated"})
+        revoke = agent.sign_revocation("abc123i0", "done")
+        # Update first, then revoke
+        state = get_current_state(reg, [update, revoke])
+        assert state is None
+
+    def test_deep_copy_isolation(self):
+        agent = AgentIdentity.generate()
+        reg = make_register(agent, caps=["original"])
+        state = get_current_state(reg, [])
+        # Mutating state should not affect original register data
+        state["capabilities"].append("mutated")
+        assert "mutated" not in reg["capabilities"]
 
 
 class TestGetAgentHistory:
@@ -165,8 +187,20 @@ class TestGetAgentHistory:
         agent = AgentIdentity.generate()
         other = AgentIdentity.generate()
         reg = make_register(agent)
-        # Signed by wrong key
         bad_update = other.sign_update("abc123i0", {"name": "Hacked"})
 
         history = get_agent_history(reg, [bad_update])
         assert history[1]["valid"] is False
+
+    def test_history_mixed_ops(self):
+        agent = AgentIdentity.generate()
+        reg = make_register(agent)
+        update = agent.sign_update("abc123i0", {"name": "V2"})
+        revoke = agent.sign_revocation("abc123i0", "retired")
+
+        history = get_agent_history(reg, [update, revoke])
+        assert len(history) == 3
+        assert history[0]["op"] == "register"
+        assert history[1]["op"] == "update"
+        assert history[2]["op"] == "revoke"
+        assert all(h["valid"] for h in history)

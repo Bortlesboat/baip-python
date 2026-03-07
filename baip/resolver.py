@@ -1,9 +1,13 @@
 """Resolve agent identity from inscription data."""
 
-import hashlib
-import json
+import copy
 
-from baip.identity import AgentIdentity
+from baip.identity import (
+    AgentIdentity,
+    canonical_attest_msg,
+    canonical_revoke_msg,
+    canonical_update_msg,
+)
 
 
 def resolve_agent(inscription_data: dict) -> dict | None:
@@ -57,10 +61,7 @@ def validate_update(update_data: dict, current_pubkey: str) -> bool:
     except (KeyError, ValueError):
         return False
 
-    sorted_fields = json.dumps(fields, sort_keys=True, separators=(",", ":"))
-    canonical = f"baip:update:{agent_id}:{sorted_fields}"
-    msg_hash = hashlib.sha256(canonical.encode()).digest()
-
+    msg_hash = canonical_update_msg(agent_id, fields)
     return AgentIdentity.verify(msg_hash, sig, current_pubkey)
 
 
@@ -76,23 +77,20 @@ def validate_revocation(revoke_data: dict, current_pubkey: str) -> bool:
     except (KeyError, ValueError):
         return False
 
-    canonical = f"baip:revoke:{agent_id}:{reason}"
-    msg_hash = hashlib.sha256(canonical.encode()).digest()
-
+    msg_hash = canonical_revoke_msg(agent_id, reason)
     return AgentIdentity.verify(msg_hash, sig, current_pubkey)
 
 
 def get_current_state(
     register_data: dict,
-    updates: list[dict],
-    revocations: list[dict] | None = None,
+    ops: list[dict],
 ) -> dict | None:
-    """Apply updates to a register inscription to get current agent state.
+    """Apply operations to a register inscription to get current agent state.
 
     Args:
         register_data: The parsed register inscription.
-        updates: List of update inscriptions, ordered by inscription number.
-        revocations: List of revocation inscriptions, ordered by inscription number.
+        ops: List of update/revoke inscriptions, ordered by inscription number.
+            Each must have an "op" field ("update" or "revoke").
 
     Returns:
         Current agent state dict, or None if revoked.
@@ -101,21 +99,14 @@ def get_current_state(
     if agent is None:
         return None
 
-    current_pubkey = agent["pubkey"]
-    state = dict(agent)
+    state = copy.deepcopy(agent)
+    current_pubkey = state["pubkey"]
 
-    # Interleave updates and revocations by their position in the list
-    # (caller must provide them in inscription-number order)
-    all_ops = []
-    for u in updates:
-        all_ops.append(("update", u))
-    for r in (revocations or []):
-        all_ops.append(("revoke", r))
-
-    for op_type, op_data in all_ops:
+    for op_data in ops:
+        op_type = op_data.get("op")
         if op_type == "revoke":
             if validate_revocation(op_data, current_pubkey):
-                return None  # Agent is revoked
+                return None
         elif op_type == "update":
             if validate_update(op_data, current_pubkey):
                 fields = op_data["fields"]
@@ -130,12 +121,16 @@ def get_current_state(
 
 def get_agent_history(
     register_data: dict,
-    updates: list[dict],
-    revocations: list[dict] | None = None,
+    ops: list[dict],
 ) -> list[dict]:
     """Return the full history of valid operations for an agent.
 
-    Returns list of dicts with 'op', 'data', and 'valid' fields.
+    Args:
+        register_data: The parsed register inscription.
+        ops: List of update/revoke inscriptions, ordered by inscription number.
+
+    Returns:
+        List of dicts with 'op', 'data', and 'valid' fields.
     """
     agent = resolve_agent(register_data)
     if agent is None:
@@ -144,14 +139,15 @@ def get_agent_history(
     current_pubkey = agent["pubkey"]
     history = [{"op": "register", "data": register_data, "valid": True}]
 
-    for u in updates:
-        valid = validate_update(u, current_pubkey)
-        history.append({"op": "update", "data": u, "valid": valid})
-        if valid and "pubkey" in u.get("fields", {}):
-            current_pubkey = u["fields"]["pubkey"]
-
-    for r in (revocations or []):
-        valid = validate_revocation(r, current_pubkey)
-        history.append({"op": "revoke", "data": r, "valid": valid})
+    for op_data in ops:
+        op_type = op_data.get("op")
+        if op_type == "update":
+            valid = validate_update(op_data, current_pubkey)
+            history.append({"op": "update", "data": op_data, "valid": valid})
+            if valid and "pubkey" in op_data.get("fields", {}):
+                current_pubkey = op_data["fields"]["pubkey"]
+        elif op_type == "revoke":
+            valid = validate_revocation(op_data, current_pubkey)
+            history.append({"op": "revoke", "data": op_data, "valid": valid})
 
     return history

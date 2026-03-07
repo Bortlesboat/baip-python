@@ -33,6 +33,11 @@ class TestCreateAttestation:
         att = create_attestation(agent, "test", "abc123i0", timestamp=1700000000)
         assert att["ts"] == 1700000000
 
+    def test_timestamp_zero_preserved(self):
+        agent = AgentIdentity.generate()
+        att = create_attestation(agent, "test", "abc123i0", timestamp=0)
+        assert att["ts"] == 0
+
 
 class TestVerifyAttestation:
     def test_valid_attestation(self):

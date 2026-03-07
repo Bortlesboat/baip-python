@@ -3,7 +3,7 @@
 import hashlib
 import time
 
-from baip.identity import AgentIdentity
+from baip.identity import AgentIdentity, canonical_attest_msg
 
 
 def create_attestation(
@@ -27,7 +27,8 @@ def create_attestation(
         payload = payload.encode()
 
     payload_hash = hashlib.sha256(payload).digest()
-    sig = identity.sign(payload_hash)
+    msg = canonical_attest_msg(payload_hash)
+    sig = identity.sign(msg)
 
     return {
         "p": "baip",
@@ -35,7 +36,7 @@ def create_attestation(
         "agent": agent_inscription_id,
         "payload_hash": payload_hash.hex(),
         "sig": sig.hex(),
-        "ts": timestamp or int(time.time()),
+        "ts": timestamp if timestamp is not None else int(time.time()),
     }
 
 
@@ -58,7 +59,8 @@ def verify_attestation(attestation: dict, pubkey_hex: str) -> bool:
     except (KeyError, ValueError):
         return False
 
-    return AgentIdentity.verify(payload_hash, sig, pubkey_hex)
+    msg = canonical_attest_msg(payload_hash)
+    return AgentIdentity.verify(msg, sig, pubkey_hex)
 
 
 def verify_attestation_payload(

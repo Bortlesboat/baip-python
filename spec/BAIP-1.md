@@ -109,7 +109,7 @@ Modifies an existing agent identity. Must be signed by the current pubkey.
 | `fields` | Yes | Object containing fields to update. Allowed: `pubkey`, `capabilities`, `endpoints`, `name`. |
 | `sig` | Yes | Schnorr signature (BIP-340) over the SHA-256 hash of the canonical update message. |
 
-**Canonical update message:** UTF-8 encoding of `baip:update:<agent>:<sorted JSON of fields>`. Sorted JSON uses keys sorted alphabetically, no whitespace.
+**Canonical update message:** `TaggedHash("BAIP/update", UTF-8(baip:update:<agent>:<sorted JSON of fields>))`. Sorted JSON uses keys sorted alphabetically, no whitespace. See [Tagged Hashing](#tagged-hashing) below.
 
 ### 3. Attest
 
@@ -134,10 +134,10 @@ Signs a payload hash to prove agent authorship of an output.
 | `op` | Yes | Must be `"attest"`. |
 | `agent` | Yes | Inscription ID of the register operation. |
 | `payload_hash` | Yes | SHA-256 hex digest of the payload being attested (64 hex chars). |
-| `sig` | Yes | Schnorr signature (BIP-340) over the raw bytes of `payload_hash` (not the hex string). |
+| `sig` | Yes | Schnorr signature (BIP-340) over `TaggedHash("BAIP/attest", payload_hash_bytes)`. |
 | `ts` | No | Unix timestamp of attestation creation. Informational only; the inscription's block timestamp is authoritative. |
 
-**Verification:** Resolve the agent's current pubkey (applying any updates), then verify the Schnorr signature over the `payload_hash` bytes.
+**Verification:** Resolve the agent's current pubkey (applying any updates), then verify the Schnorr signature over `TaggedHash("BAIP/attest", payload_hash_bytes)`.
 
 Attestations MAY be inscribed on-chain for permanent proof, or distributed off-chain as JSON files. Both are verifiable given the agent's pubkey.
 
@@ -155,7 +155,7 @@ Permanently deactivates an agent identity.
 }
 ```
 
-**Canonical revocation message:** `baip:revoke:<agent>:<reason>`
+**Canonical revocation message:** `TaggedHash("BAIP/revoke", UTF-8(baip:revoke:<agent>:<reason>))`
 
 After revocation, all subsequent updates and attestations for this agent MUST be rejected.
 
@@ -171,6 +171,31 @@ To resolve an agent's current state:
 6. If a valid revoke is found, the agent is deactivated.
 
 **Current state** = register fields, with any valid updates applied.
+
+## Tagged Hashing
+
+All BAIP signatures use BIP-340 tagged hashing for domain separation. This ensures a signature created for one operation type (e.g., attestation) can never be valid for a different operation type (e.g., update), even if the underlying message bytes happen to collide.
+
+```
+TaggedHash(tag, msg) = SHA256(SHA256(tag) || SHA256(tag) || msg)
+```
+
+BAIP uses three tags:
+- `"BAIP/attest"` — attestation signatures
+- `"BAIP/update"` — update signatures
+- `"BAIP/revoke"` — revocation signatures
+
+This follows the same tagged hash construction used by Bitcoin's Taproot (BIP-340/341).
+
+## Version Negotiation
+
+The `"v"` field in register inscriptions indicates the protocol version. The following rules apply:
+
+- Resolvers MUST ignore inscriptions with a version they do not support.
+- Update and revoke operations inherit the version of their parent register inscription. They do not carry their own version field.
+- A resolver that supports version `"1"` encountering a version `"2"` register MUST treat it as if the inscription does not exist (skip it silently).
+
+This ensures forward compatibility: new protocol versions can be deployed without breaking existing resolvers.
 
 ## Security Model
 
