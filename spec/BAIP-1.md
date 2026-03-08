@@ -1,7 +1,7 @@
 # BAIP-1: Bitcoin Agent Identity Protocol
 
 **Version:** 1.0-draft
-**Author:** Andrew Barnes
+**Author:** Bortlesboat
 **Created:** 2026-03-06
 **Status:** Draft
 
