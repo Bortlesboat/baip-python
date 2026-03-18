@@ -3,6 +3,7 @@
 [![Tests](https://github.com/Bortlesboat/baip-python/actions/workflows/test.yml/badge.svg)](https://github.com/Bortlesboat/baip-python/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![OpenSats](https://img.shields.io/badge/Support-OpenSats-F7931A)](https://opensats.org)
 
 **61 tests** · **4 core operations** · **BIP-340 Schnorr signatures** · **MIT licensed**
 
