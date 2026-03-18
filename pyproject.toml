@@ -31,6 +31,9 @@ dev = [
     "pytest-cov",
 ]
 
+[tool.setuptools.packages.find]
+include = ["baip*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
