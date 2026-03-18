@@ -1,6 +1,12 @@
 # BAIP-Python
 
-Python SDK for the **Bitcoin Agent Identity Protocol (BAIP-1)** -- verifiable AI agent identities anchored to Bitcoin via ordinal inscriptions.
+[![Tests](https://github.com/Bortlesboat/baip-python/actions/workflows/test.yml/badge.svg)](https://github.com/Bortlesboat/baip-python/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
+**61 tests** · **4 core operations** · **BIP-340 Schnorr signatures** · **MIT licensed**
+
+Python SDK for the **Bitcoin Agent Identity Protocol (BAIP-1)** — verifiable AI agent identities anchored to Bitcoin via ordinal inscriptions.
 
 ## What is BAIP?
 
@@ -67,6 +73,16 @@ print(f"Inscription ID: {result['inscriptions'][0]['id']}")
 pytest tests/ -v
 pytest tests/ -v -m "not live"  # Skip tests requiring running node
 ```
+
+## Related Projects
+
+- [Satoshi API](https://github.com/Bortlesboat/bitcoin-api) — Bitcoin fee intelligence API (108 endpoints, Apache 2.0)
+- [bitcoin-mcp](https://github.com/Bortlesboat/bitcoin-mcp) — First Bitcoin MCP server on the Anthropic Registry (49 tools)
+- [bitcoin-fee-observatory](https://github.com/Bortlesboat/bitcoin-fee-observatory) — Fee market analytics dashboard
+
+## Support
+
+This project is part of the Satoshi API ecosystem. Support development through [OpenSats](https://opensats.org).
 
 ## License
 
