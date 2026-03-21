@@ -77,9 +77,9 @@ pytest tests/ -v -m "not live"  # Skip tests requiring running node
 
 ## Related Projects
 
-- [Satoshi API](https://github.com/Bortlesboat/bitcoin-api) — Bitcoin fee intelligence API (108 endpoints, Apache 2.0)
-- [bitcoin-mcp](https://github.com/Bortlesboat/bitcoin-mcp) — First Bitcoin MCP server on the Anthropic Registry (49 tools)
-- [bitcoin-fee-observatory](https://github.com/Bortlesboat/bitcoin-fee-observatory) — Fee market analytics dashboard
+- [bitcoin-mcp](https://github.com/Bortlesboat/bitcoin-mcp) — MCP server with 49 Bitcoin tools for AI agents
+- [Satoshi API](https://github.com/Bortlesboat/bitcoin-api) — Bitcoin fee intelligence API
+- [ChainPulse](https://github.com/Bortlesboat/chainpulse) — AI-powered Bitcoin network intelligence CLI
 
 ## Support
 
